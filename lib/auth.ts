@@ -1,85 +1,253 @@
-// Simple local authentication service
-import { v4 as uuidv4 } from 'uuid';
-
+// Simple authentication system for demo purposes
 export interface AuthUser {
   id: string;
+  name: string;
   email: string;
-  full_name?: string;
-  subscription_plan: "free" | "basic" | "advanced" | "pro";
-  subscription_status: "active" | "inactive" | "expired";
+  role: 'user' | 'admin';
+  plan: 'basic' | 'advanced' | 'pro';
+  avatar?: string;
 }
 
-// Simple local storage based auth (for demo purposes)
-export class AuthService {
-  private static STORAGE_KEY = 'chat2site_user';
+export interface AuthState {
+  user: AuthUser | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+}
 
-  static async signUp(email: string, password: string, fullName?: string) {
-    // Simulate API call
+// Mock authentication service
+class AuthService {
+  private static instance: AuthService;
+  private currentUser: AuthUser | null = null;
+
+  static getInstance(): AuthService {
+    if (!AuthService.instance) {
+      AuthService.instance = new AuthService();
+    }
+    return AuthService.instance;
+  }
+
+  async login(email: string, password: string): Promise<AuthUser> {
+    // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const user: AuthUser = {
-      id: uuidv4(),
-      email,
-      full_name: fullName,
-      subscription_plan: "free",
-      subscription_status: "inactive",
+
+    // Mock user data
+    const mockUser: AuthUser = {
+      id: '1',
+      name: 'أحمد محمد',
+      email: email,
+      role: email.includes('admin') ? 'admin' : 'user',
+      plan: 'advanced',
+      avatar: '/placeholder-user.jpg'
     };
 
-    // Store in localStorage (in real app, this would be in a database)
+    this.currentUser = mockUser;
+    
+    // Store in localStorage for persistence
     if (typeof window !== 'undefined') {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(user));
+      localStorage.setItem('auth_user', JSON.stringify(mockUser));
     }
 
-    return { user };
+    return mockUser;
   }
 
-  static async signIn(email: string, password: string) {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // For demo, accept any email/password
-    const user: AuthUser = {
-      id: uuidv4(),
+  async register(name: string, email: string, password: string): Promise<AuthUser> {
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    const newUser: AuthUser = {
+      id: Math.random().toString(36).substr(2, 9),
+      name,
       email,
-      full_name: email.split('@')[0],
-      subscription_plan: "basic",
-      subscription_status: "active",
+      role: 'user',
+      plan: 'basic'
     };
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(user));
-    }
-
-    return { user };
-  }
-
-  static async signOut() {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(this.STORAGE_KEY);
-    }
-  }
-
-  static async getCurrentUser(): Promise<AuthUser | null> {
-    if (typeof window === 'undefined') return null;
+    this.currentUser = newUser;
     
-    const userData = localStorage.getItem(this.STORAGE_KEY);
-    if (!userData) return null;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('auth_user', JSON.stringify(newUser));
+    }
 
-    try {
-      return JSON.parse(userData);
-    } catch {
-      return null;
+    return newUser;
+  }
+
+  async logout(): Promise<void> {
+    this.currentUser = null;
+    
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth_user');
     }
   }
 
-  static async updateProfile(updates: Partial<AuthUser>) {
-    const currentUser = await this.getCurrentUser();
-    if (!currentUser) throw new Error("Not authenticated");
+  getCurrentUser(): AuthUser | null {
+    if (this.currentUser) {
+      return this.currentUser;
+    }
+
+    // Try to get from localStorage
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('auth_user');
+      if (stored) {
+        try {
+          this.currentUser = JSON.parse(stored);
+          return this.currentUser;
+        } catch {
+          localStorage.removeItem('auth_user');
+        }
+      }
+    }
+
+    return null;
+  }
+
+  isAuthenticated(): boolean {
+    return this.getCurrentUser() !== null;
+  }
+
+  isAdmin(): boolean {
+    const user = this.getCurrentUser();
+    return user?.role === 'admin';
+  }
+
+  async refreshToken(): Promise<AuthUser | null> {
+    // In a real app, this would refresh the JWT token
+    return this.getCurrentUser();
+  }
+
+  async updateProfile(updates: Partial<Pick<AuthUser, 'name' | 'avatar'>>): Promise<AuthUser> {
+    const currentUser = this.getCurrentUser();
+    if (!currentUser) {
+      throw new Error('لم يتم تسجيل الدخول');
+    }
 
     const updatedUser = { ...currentUser, ...updates };
+    this.currentUser = updatedUser;
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('auth_user', JSON.stringify(updatedUser));
+    }
+
+    return updatedUser;
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // In a real app, this would validate current password and update
+    console.log('Password changed successfully');
+  }
+
+  // Social login methods
+  async loginWithGoogle(): Promise<AuthUser> {
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    const googleUser: AuthUser = {
+      id: 'google_' + Math.random().toString(36).substr(2, 9),
+      name: 'مستخدم Google',
+      email: 'user@gmail.com',
+      role: 'user',
+      plan: 'basic',
+      avatar: '/placeholder-user.jpg'
+    };
+
+    this.currentUser = googleUser;
     
     if (typeof window !== 'undefined') {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedUser));
+      localStorage.setItem('auth_user', JSON.stringify(googleUser));
     }
+
+    return googleUser;
   }
+
+  async requestPasswordReset(email: string): Promise<void> {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log('Password reset email sent to:', email);
+  }
+}
+
+export const authService = AuthService.getInstance();
+
+// React hook for authentication
+import { useState, useEffect } from 'react';
+
+export function useAuth() {
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    isLoading: true,
+    isAuthenticated: false
+  });
+
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const user = await authService.refreshToken();
+        setAuthState({
+          user,
+          isLoading: false,
+          isAuthenticated: !!user
+        });
+      } catch {
+        setAuthState({
+          user: null,
+          isLoading: false,
+          isAuthenticated: false
+        });
+      }
+    };
+
+    initAuth();
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    setAuthState(prev => ({ ...prev, isLoading: true }));
+    try {
+      const user = await authService.login(email, password);
+      setAuthState({
+        user,
+        isLoading: false,
+        isAuthenticated: true
+      });
+      return user;
+    } catch (error) {
+      setAuthState(prev => ({ ...prev, isLoading: false }));
+      throw error;
+    }
+  };
+
+  const register = async (name: string, email: string, password: string) => {
+    setAuthState(prev => ({ ...prev, isLoading: true }));
+    try {
+      const user = await authService.register(name, email, password);
+      setAuthState({
+        user,
+        isLoading: false,
+        isAuthenticated: true
+      });
+      return user;
+    } catch (error) {
+      setAuthState(prev => ({ ...prev, isLoading: false }));
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    await authService.logout();
+    setAuthState({
+      user: null,
+      isLoading: false,
+      isAuthenticated: false
+    });
+  };
+
+  return {
+    ...authState,
+    login,
+    register,
+    logout,
+    updateProfile: authService.updateProfile.bind(authService),
+    changePassword: authService.changePassword.bind(authService),
+    loginWithGoogle: authService.loginWithGoogle.bind(authService),
+    requestPasswordReset: authService.requestPasswordReset.bind(authService)
+  };
 }

@@ -1,35 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAIResponse, quickActionResponses, ChatState } from '@/lib/ai-responses';
+import { getAIResponse, ChatState } from '@/lib/ai-responses';
 
 export async function POST(request: NextRequest) {
   try {
     const { message, chatState } = await request.json();
-    
-    // Check if it's a quick action
-    if (quickActionResponses[message]) {
-      const response = quickActionResponses[message];
-      return NextResponse.json({
-        success: true,
-        response: response
-      });
+
+    if (!message || !chatState) {
+      return NextResponse.json(
+        { success: false, error: 'البيانات المطلوبة مفقودة' },
+        { status: 400 }
+      );
     }
-    
-    // Get AI response based on current state
-    const aiResponse = getAIResponse(message, chatState);
-    
-    // Simulate the AI "thinking" time
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
+
+    // Simulate AI processing delay
+    const aiResponse = getAIResponse(message, chatState as ChatState);
+
     return NextResponse.json({
       success: true,
       response: aiResponse
     });
-    
   } catch (error) {
-    console.error('Error in chat API:', error);
-    return NextResponse.json({
-      error: 'حدث خطأ في معالجة الرسالة',
-      success: false
-    }, { status: 500 });
+    console.error('Chat API Error:', error);
+    return NextResponse.json(
+      { success: false, error: 'حدث خطأ في معالجة الطلب' },
+      { status: 500 }
+    );
   }
 }
