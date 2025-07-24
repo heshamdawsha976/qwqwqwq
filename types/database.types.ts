@@ -25,7 +25,8 @@ export interface AdminSettings {
   advanced_plan_price: number;
   pro_plan_price: number;
 }
-  public: {
+
+export interface Database {
     Tables: {
       users: {
         Row: {
