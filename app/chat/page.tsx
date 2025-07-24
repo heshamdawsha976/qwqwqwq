@@ -22,6 +22,8 @@ interface Message {
     description: string
     template: string
     colors: string[]
+    html?: string
+    css?: string
   } | null
 }
 
