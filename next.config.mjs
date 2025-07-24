@@ -2,7 +2,7 @@
 const nextConfig = {
   // تحسينات الأداء
   experimental: {
-    optimizeCss: true,
+    // optimizeCss: true, // Disabled temporarily due to missing critters dependency
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
   
