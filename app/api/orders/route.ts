@@ -4,20 +4,21 @@ import { z } from 'zod';
 
 // Validation schema for orders
 const orderSchema = z.object({
-  customerName: z.string().min(2).max(100),
-  email: z.string().email(),
+  userId: z.string().default('temp'),
+  customerName: z.string().min(2).max(100).optional(),
+  email: z.string().email().optional(),
   phone: z.string().optional(),
-  websiteType: z.enum(['restaurant', 'shop', 'clinic', 'portfolio', 'business']),
+  websiteType: z.enum(['restaurant', 'shop', 'clinic', 'portfolio', 'business']).optional(),
   plan: z.enum(['basic', 'advanced', 'pro']),
   amount: z.number().positive(),
-  currency: z.enum(['USD', 'SAR']).default('USD'),
+  currency: z.string().default('USD'),
   websiteData: z.object({
-    title: z.string().min(1).max(200),
-    description: z.string().min(10).max(1000),
-    sections: z.array(z.string()),
-    colors: z.array(z.string()),
+    title: z.string().min(1).max(200).optional(),
+    description: z.string().min(10).max(1000).optional(),
+    sections: z.array(z.string()).optional(),
+    colors: z.array(z.string()).optional(),
     customizations: z.record(z.any()).default({}),
-  })
+  }).optional()
 });
 
 export async function GET(request: NextRequest) {
