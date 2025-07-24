@@ -13,6 +13,7 @@ interface AuthContextType {
 }
 
 const AuthContextInternal = React.createContext<AuthContextType | undefined>(undefined)
+const AuthProvider_Internal = AuthContextInternal.Provider
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
