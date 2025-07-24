@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get initial user
     if (AuthService) {
-      AuthService.getCurrentUser()?.then((user) => {
+      AuthService!.getCurrentUser().then((user) => {
         setUser(user)
         setLoading(false)
       })
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (AuthService) {
       const {
         data: { subscription },
-      } = AuthService.onAuthStateChange((user) => {
+      } = AuthService!.onAuthStateChange((user) => {
         setUser(user)
         setLoading(false)
       })
