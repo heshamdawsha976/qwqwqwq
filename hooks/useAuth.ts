@@ -12,8 +12,7 @@ interface AuthContextType {
   updateProfile: (updates: Partial<AuthUser>) => Promise<void>
 }
 
-const AuthContextInternal = React.createContext<AuthContextType | undefined>(undefined)
-const AuthProvider_Internal = AuthContextInternal.Provider
+const MyAuthContext = React.createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
