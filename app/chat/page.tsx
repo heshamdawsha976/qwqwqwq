@@ -22,7 +22,7 @@ interface Message {
     description: string
     template: string
     colors: string[]
-  }
+  } | null
 }
 
 export default function ChatPage() {
