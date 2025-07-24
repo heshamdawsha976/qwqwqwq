@@ -1,40 +1,38 @@
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from 'next/server';
+import { websiteTemplates, getTemplateByCategory, getTemplateById } from '@/lib/templates';
 
-export async function GET(request: Request) {
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
-
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const category = searchParams.get("category")
-    const featured = searchParams.get("featured")
-
-    let query = supabase
-      .from("templates")
-      .select("*")
-      .eq("is_active", true)
-      .order("is_featured", { ascending: false })
-      .order("usage_count", { ascending: false })
-
-    if (category && category !== "الكل") {
-      query = query.eq("category", category)
+    const { searchParams } = new URL(request.url);
+    const category = searchParams.get('category');
+    const id = searchParams.get('id');
+    
+    if (id) {
+      // Get specific template by ID
+      const template = getTemplateById(id);
+      if (!template) {
+        return NextResponse.json(
+          { error: 'Template not found' },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({ template });
     }
-
-    if (featured === "true") {
-      query = query.eq("is_featured", true)
+    
+    if (category && category !== 'all') {
+      // Get templates by category
+      const templates = getTemplateByCategory(category);
+      return NextResponse.json({ templates });
     }
-
-    const { data: templates, error } = await query
-
-    if (error) {
-      throw error
-    }
-
-    return NextResponse.json({ templates })
+    
+    // Get all templates
+    return NextResponse.json({ templates: websiteTemplates });
+    
   } catch (error) {
-    console.error("Error fetching templates:", error)
-    return NextResponse.json({ error: "Failed to fetch templates" }, { status: 500 })
+    console.error('Error fetching templates:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch templates' },
+      { status: 500 }
+    );
   }
 }
