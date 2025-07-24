@@ -3,17 +3,13 @@
 import type React from "react"
 import { createContext, useContext } from "react"
 import { useAdminSettings } from "@/hooks/useAdminSettings"
-import type { AdminSettings } from "@/lib/admin-settings"
+import type { AdminSettings } from "@/types/database.types"
 
 interface SettingsContextType {
   settings: AdminSettings | null
   loading: boolean
   error: string | null
   saveSettings: (settings: AdminSettings) => Promise<boolean>
-  updateSetting: (key: string, value: any) => Promise<boolean>
-  resetToDefaults: () => Promise<boolean>
-  exportSettings: () => Promise<string | null>
-  importSettings: (settingsJson: string) => Promise<boolean>
   refetch: () => Promise<void>
 }
 
