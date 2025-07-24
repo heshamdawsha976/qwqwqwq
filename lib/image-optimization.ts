@@ -1,297 +1,296 @@
-"use client"
-
-import type React from "react"
-
-interface ImageOptimizationOptions {
-  quality?: number
-  format?: "webp" | "jpeg" | "png"
+// Image optimization utilities
+export interface ImageOptions {
   width?: number
   height?: number
-  fit?: "cover" | "contain" | "fill"
+  quality?: number
+  format?: 'webp' | 'jpeg' | 'png'
+  fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside'
 }
 
-export class ImageOptimizer {
-  private static canvas: HTMLCanvasElement | null = null
-  private static ctx: CanvasRenderingContext2D | null = null
+export interface OptimizedImage {
+  src: string
+  width: number
+  height: number
+  format: string
+  size: number
+}
 
-  private static getCanvas(): HTMLCanvasElement {
-    if (!this.canvas) {
-      this.canvas = document.createElement("canvas")
-      this.ctx = this.canvas.getContext("2d")
-    }
-    return this.canvas
+// Image optimization service
+class ImageOptimizer {
+  private baseUrl = '/api/images'
+
+  // Generate optimized image URL
+  generateUrl(src: string, options: ImageOptions = {}): string {
+    const params = new URLSearchParams()
+    
+    if (options.width) params.set('w', options.width.toString())
+    if (options.height) params.set('h', options.height.toString())
+    if (options.quality) params.set('q', options.quality.toString())
+    if (options.format) params.set('f', options.format)
+    if (options.fit) params.set('fit', options.fit)
+    
+    params.set('url', encodeURIComponent(src))
+    
+    return `${this.baseUrl}?${params.toString()}`
   }
 
-  static async optimizeImage(file: File, options: ImageOptimizationOptions = {}): Promise<Blob> {
-    const { quality = 0.8, format = "webp", width, height, fit = "cover" } = options
+  // Generate responsive image srcset
+  generateSrcSet(src: string, widths: number[], options: Omit<ImageOptions, 'width'> = {}): string {
+    return widths
+      .map(width => {
+        const url = this.generateUrl(src, { ...options, width })
+        return `${url} ${width}w`
+      })
+      .join(', ')
+  }
 
+  // Generate picture element sources
+  generatePictureSource(src: string, options: ImageOptions & { media?: string } = {}): string {
+    const url = this.generateUrl(src, options)
+    const attributes = []
+    
+    if (options.media) attributes.push(`media="${options.media}"`)
+    attributes.push(`srcset="${url}"`)
+    if (options.format) attributes.push(`type="image/${options.format}"`)
+    
+    return `<source ${attributes.join(' ')} />`
+  }
+
+  // Preload critical images
+  preloadImage(src: string, options: ImageOptions = {}): void {
+    if (typeof document === 'undefined') return
+
+    const link = document.createElement('link')
+    link.rel = 'preload'
+    link.as = 'image'
+    link.href = this.generateUrl(src, options)
+    
+    if (options.format) {
+      link.type = `image/${options.format}`
+    }
+    
+    document.head.appendChild(link)
+  }
+
+  // Lazy load image with intersection observer
+  lazyLoad(
+    img: HTMLImageElement,
+    src: string,
+    options: ImageOptions = {},
+    callback?: () => void
+  ): IntersectionObserver {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const target = entry.target as HTMLImageElement
+          target.src = this.generateUrl(src, options)
+          
+          target.onload = () => {
+            target.classList.add('loaded')
+            callback?.()
+          }
+          
+          observer.unobserve(target)
+        }
+      })
+    }, { threshold: 0.1 })
+
+    observer.observe(img)
+    return observer
+  }
+
+  // Check if image format is supported
+  isFormatSupported(format: string): boolean {
+    if (typeof window === 'undefined') return false
+
+    const canvas = document.createElement('canvas')
+    canvas.width = 1
+    canvas.height = 1
+    
+    try {
+      return canvas.toDataURL(`image/${format}`).startsWith(`data:image/${format}`)
+    } catch {
+      return false
+    }
+  }
+
+  // Get optimal format for browser
+  getOptimalFormat(): 'webp' | 'jpeg' {
+    if (this.isFormatSupported('webp')) {
+      return 'webp'
+    }
+    return 'jpeg'
+  }
+
+  // Calculate aspect ratio
+  calculateAspectRatio(width: number, height: number): number {
+    return width / height
+  }
+
+  // Generate placeholder data URL
+  generatePlaceholder(width: number, height: number, color = '#f3f4f6'): string {
+    if (typeof window === 'undefined') {
+      return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${width}' height='${height}'%3E%3Crect width='100%25' height='100%25' fill='${encodeURIComponent(color)}'/%3E%3C/svg%3E`
+    }
+
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    
+    canvas.width = width
+    canvas.height = height
+    
+    if (ctx) {
+      ctx.fillStyle = color
+      ctx.fillRect(0, 0, width, height)
+    }
+    
+    return canvas.toDataURL('image/jpeg', 0.1)
+  }
+
+  // Generate blur placeholder
+  generateBlurPlaceholder(src: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const img = new Image()
-
+      img.crossOrigin = 'anonymous'
+      
       img.onload = () => {
-        try {
-          const canvas = this.getCanvas()
-          const ctx = this.ctx!
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        
+        // Small size for blur effect
+        canvas.width = 10
+        canvas.height = 10
+        
+        if (ctx) {
+          ctx.filter = 'blur(2px)'
+          ctx.drawImage(img, 0, 0, 10, 10)
+          resolve(canvas.toDataURL('image/jpeg', 0.1))
+        } else {
+          reject(new Error('Canvas context not available'))
+        }
+      }
+      
+      img.onerror = () => reject(new Error('Failed to load image'))
+      img.src = src
+    })
+  }
+}
 
-          // Calculate dimensions
-          const { width: targetWidth, height: targetHeight } = this.calculateDimensions(
-            img.width,
-            img.height,
-            width,
-            height,
-            fit,
-          )
+// Singleton instance
+export const imageOptimizer = new ImageOptimizer()
 
-          canvas.width = targetWidth
-          canvas.height = targetHeight
+// React hook for responsive images
+import { useState, useEffect } from 'react'
 
-          // Clear canvas
-          ctx.clearRect(0, 0, targetWidth, targetHeight)
+export function useResponsiveImage(
+  src: string,
+  options: ImageOptions = {}
+): {
+  src: string
+  srcSet: string
+  isLoaded: boolean
+  error: string | null
+} {
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-          // Draw image
-          if (fit === "cover") {
-            this.drawImageCover(ctx, img, targetWidth, targetHeight)
-          } else if (fit === "contain") {
-            this.drawImageContain(ctx, img, targetWidth, targetHeight)
-          } else {
-            ctx.drawImage(img, 0, 0, targetWidth, targetHeight)
-          }
+  const optimizedSrc = imageOptimizer.generateUrl(src, options)
+  const srcSet = imageOptimizer.generateSrcSet(src, [400, 800, 1200], options)
 
-          // Convert to blob
-          canvas.toBlob(
-            (blob) => {
-              if (blob) {
-                resolve(blob)
-              } else {
-                reject(new Error("Failed to create blob"))
-              }
-            },
-            `image/${format}`,
-            quality,
-          )
-        } catch (error) {
-          reject(error)
+  useEffect(() => {
+    const img = new Image()
+    
+    img.onload = () => {
+      setIsLoaded(true)
+      setError(null)
+    }
+    
+    img.onerror = () => {
+      setError('Failed to load image')
+      setIsLoaded(false)
+    }
+    
+    img.src = optimizedSrc
+  }, [optimizedSrc])
+
+  return {
+    src: optimizedSrc,
+    srcSet,
+    isLoaded,
+    error
+  }
+}
+
+// Utility functions
+export function getImageDimensions(src: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    
+    img.onload = () => {
+      resolve({
+        width: img.naturalWidth,
+        height: img.naturalHeight
+      })
+    }
+    
+    img.onerror = () => reject(new Error('Failed to load image'))
+    img.src = src
+  })
+}
+
+export function resizeImage(
+  file: File,
+  maxWidth: number,
+  maxHeight: number,
+  quality = 0.8
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      
+      if (!ctx) {
+        reject(new Error('Canvas context not available'))
+        return
+      }
+
+      // Calculate new dimensions
+      let { width, height } = img
+      
+      if (width > height) {
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width
+          width = maxWidth
+        }
+      } else {
+        if (height > maxHeight) {
+          width = (width * maxHeight) / height
+          height = maxHeight
         }
       }
 
-      img.onerror = () => reject(new Error("Failed to load image"))
-      img.src = URL.createObjectURL(file)
-    })
-  }
+      canvas.width = width
+      canvas.height = height
 
-  private static calculateDimensions(
-    originalWidth: number,
-    originalHeight: number,
-    targetWidth?: number,
-    targetHeight?: number,
-    fit = "cover",
-  ) {
-    if (!targetWidth && !targetHeight) {
-      return { width: originalWidth, height: originalHeight }
+      // Draw and compress
+      ctx.drawImage(img, 0, 0, width, height)
+      
+      canvas.toBlob(
+        blob => {
+          if (blob) {
+            resolve(blob)
+          } else {
+            reject(new Error('Failed to create blob'))
+          }
+        },
+        'image/jpeg',
+        quality
+      )
     }
-
-    if (targetWidth && !targetHeight) {
-      const ratio = targetWidth / originalWidth
-      return { width: targetWidth, height: Math.round(originalHeight * ratio) }
-    }
-
-    if (!targetWidth && targetHeight) {
-      const ratio = targetHeight / originalHeight
-      return { width: Math.round(originalWidth * ratio), height: targetHeight }
-    }
-
-    return { width: targetWidth!, height: targetHeight! }
-  }
-
-  private static drawImageCover(
-    ctx: CanvasRenderingContext2D,
-    img: HTMLImageElement,
-    targetWidth: number,
-    targetHeight: number,
-  ) {
-    const scale = Math.max(targetWidth / img.width, targetHeight / img.height)
-    const scaledWidth = img.width * scale
-    const scaledHeight = img.height * scale
-    const x = (targetWidth - scaledWidth) / 2
-    const y = (targetHeight - scaledHeight) / 2
-
-    ctx.drawImage(img, x, y, scaledWidth, scaledHeight)
-  }
-
-  private static drawImageContain(
-    ctx: CanvasRenderingContext2D,
-    img: HTMLImageElement,
-    targetWidth: number,
-    targetHeight: number,
-  ) {
-    const scale = Math.min(targetWidth / img.width, targetHeight / img.height)
-    const scaledWidth = img.width * scale
-    const scaledHeight = img.height * scale
-    const x = (targetWidth - scaledWidth) / 2
-    const y = (targetHeight - scaledHeight) / 2
-
-    ctx.drawImage(img, x, y, scaledWidth, scaledHeight)
-  }
-
-  static generatePlaceholder(width: number, height: number, color = "#f0f0f0"): string {
-    const canvas = document.createElement("canvas")
-    const ctx = canvas.getContext("2d")!
-
-    canvas.width = width
-    canvas.height = height
-
-    ctx.fillStyle = color
-    ctx.fillRect(0, 0, width, height)
-
-    return canvas.toDataURL()
-  }
-
-  static async createThumbnail(file: File, size = 150): Promise<Blob> {
-    return this.optimizeImage(file, {
-      width: size,
-      height: size,
-      fit: "cover",
-      quality: 0.7,
-      format: "webp",
-    })
-  }
-
-  static getOptimizedImageUrl(src: string, options: ImageOptimizationOptions = {}): string {
-    if (src.startsWith("data:") || src.startsWith("blob:")) {
-      return src
-    }
-
-    // For placeholder.svg URLs, add parameters
-    if (src.includes("placeholder.svg")) {
-      const url = new URL(src, window.location.origin)
-
-      if (options.width) url.searchParams.set("width", options.width.toString())
-      if (options.height) url.searchParams.set("height", options.height.toString())
-
-      return url.toString()
-    }
-
-    // For other images, you could integrate with image optimization services
-    // like Cloudinary, ImageKit, or Next.js Image Optimization
-    return src
-  }
+    
+    img.onerror = () => reject(new Error('Failed to load image'))
+    img.src = URL.createObjectURL(file)
+  })
 }
-
-// React hook for image optimization
-export function useImageOptimization() {
-  const [isOptimizing, setIsOptimizing] = useState(false)
-
-  const optimizeImage = useCallback(async (file: File, options: ImageOptimizationOptions = {}): Promise<Blob> => {
-    setIsOptimizing(true)
-    try {
-      const optimizedBlob = await ImageOptimizer.optimizeImage(file, options)
-      return optimizedBlob
-    } finally {
-      setIsOptimizing(false)
-    }
-  }, [])
-
-  const createThumbnail = useCallback(async (file: File, size = 150): Promise<Blob> => {
-    setIsOptimizing(true)
-    try {
-      const thumbnail = await ImageOptimizer.createThumbnail(file, size)
-      return thumbnail
-    } finally {
-      setIsOptimizing(false)
-    }
-  }, [])
-
-  return {
-    optimizeImage,
-    createThumbnail,
-    isOptimizing,
-  }
-}
-
-// Lazy loading image component
-export function LazyImage({
-  src,
-  alt,
-  width,
-  height,
-  className = "",
-  placeholder,
-  onLoad,
-  onError,
-  ...props
-}: React.ImgHTMLAttributes<HTMLImageElement> & {
-  placeholder?: string
-}) {
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [hasError, setHasError] = useState(false)
-  const [isInView, setIsInView] = useState(false)
-  const imgRef = useRef<HTMLImageElement>(null)
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsInView(true)
-          observer.disconnect()
-        }
-      },
-      { threshold: 0.1 },
-    )
-
-    if (imgRef.current) {
-      observer.observe(imgRef.current)
-    }
-
-    return () => observer.disconnect()
-  }, [])
-
-  const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    setIsLoaded(true)
-    onLoad?.(e)
-  }
-
-  const handleError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    setHasError(true)
-    onError?.(e)
-  }
-
-  const optimizedSrc = useMemo(() => {
-    if (!src || !isInView) return placeholder || ImageOptimizer.generatePlaceholder(300, 200)
-    return ImageOptimizer.getOptimizedImageUrl(src, { width: Number(width), height: Number(height) })
-  }, [src, isInView, width, height, placeholder])
-
-  return (
-    <div className={`relative overflow-hidden ${className}`} style={{ width, height }}>
-      <img
-        ref={imgRef}
-        src={optimizedSrc || "/placeholder.svg"}
-        alt={alt}
-        width={width}
-        height={height}
-        onLoad={handleLoad}
-        onError={handleError}
-        className={`transition-opacity duration-300 ${isLoaded && !hasError ? "opacity-100" : "opacity-0"}`}
-        loading="lazy"
-        decoding="async"
-        {...props}
-      />
-
-      {!isLoaded && !hasError && isInView && (
-        <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      )}
-
-      {hasError && (
-        <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
-          <div className="text-gray-400 text-center">
-            <div className="text-2xl mb-2">📷</div>
-            <div className="text-sm">فشل في تحميل الصورة</div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-import { useState, useMemo, useCallback, useRef, useEffect } from "react"
