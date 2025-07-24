@@ -438,9 +438,9 @@ export default function HomePage() {
                     </div>
                   </div>
                   <div className="flex-1">
-                    <h4 className="text-xl font-bold text-gray-800">{testimonials[currentTestimonial].name}</h4>
-                    <p className="text-gray-600">{testimonials[currentTestimonial].role}</p>
-                    <p className="text-blue-600 text-sm font-medium">{testimonials[currentTestimonial].company}</p>
+                    <h4 className="text-xl font-bold text-gray-800">{testimonials[currentTestimonial]?.name || ""}</h4>
+                    <p className="text-gray-600">{testimonials[currentTestimonial]?.role || ""}</p>
+                    <p className="text-blue-600 text-sm font-medium">{testimonials[currentTestimonial]?.company || ""}</p>
                   </div>
                   <div className="flex">
                     {[...Array(testimonials[currentTestimonial].rating)].map((_, i) => (
