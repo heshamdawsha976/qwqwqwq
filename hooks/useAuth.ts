@@ -23,10 +23,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get initial user
     if (AuthService) {
-      AuthService.getCurrentUser().then((user) => {
-        setUser(user)
-        setLoading(false)
-      })
+      const user = AuthService.getCurrentUser()
+      setUser(user)
+      setLoading(false)
     } else {
       setLoading(false)
     }
