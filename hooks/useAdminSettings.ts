@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { AdminSettingsService, type AdminSettings } from "@/lib/admin-settings"
+import { type AdminSettings } from "@/types/database.types"
 
 export function useAdminSettings() {
   const [settings, setSettings] = useState<AdminSettings | null>(null)
