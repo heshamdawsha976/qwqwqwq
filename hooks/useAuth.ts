@@ -23,28 +23,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get initial user
     if (AuthService) {
-      AuthService!.getCurrentUser().then((user) => {
+      AuthService.getCurrentUser().then((user) => {
         setUser(user)
         setLoading(false)
       })
     } else {
       setLoading(false)
     }
-
-    // Listen for auth changes
-    if (AuthService) {
-      const {
-        data: { subscription },
-      } = AuthService!.onAuthStateChange((user) => {
-        setUser(user)
-        setLoading(false)
-      })
-
-      return () => subscription.unsubscribe()
-    }
-    
-    // Return empty cleanup function if AuthService is not available
-    return () => {}
   }, [])
 
   const signIn = async (email: string, password: string) => {
