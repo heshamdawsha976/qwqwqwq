@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     setLoading(true)
     try {
-      await AuthService.signOut()
+      await AuthService.logout()
       setUser(null)
     } finally {
       setLoading(false)
