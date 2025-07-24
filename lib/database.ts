@@ -42,6 +42,15 @@ const mockData = {
   orders: [] as Order[],
 };
 
+// Convenience functions for API compatibility
+export async function getOrders(): Promise<Order[]> {
+  return OrderService.getAll();
+}
+
+export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'status'>): Promise<Order> {
+  return OrderService.create(orderData);
+}
+
 // User operations
 export class UserService {
   static async create(userData: Omit<User, 'id' | 'createdAt' | 'websites'>): Promise<User> {
