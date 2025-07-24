@@ -32,14 +32,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Listen for auth changes
-    const {
-      data: { subscription },
-    } = AuthService.onAuthStateChange((user) => {
-      setUser(user)
-      setLoading(false)
-    })
+    if (AuthService) {
+      const {
+        data: { subscription },
+      } = AuthService.onAuthStateChange((user) => {
+        setUser(user)
+        setLoading(false)
+      })
 
-    return () => subscription.unsubscribe()
+      return () => subscription.unsubscribe()
+    }
   }, [])
 
   const signIn = async (email: string, password: string) => {
