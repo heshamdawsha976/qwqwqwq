@@ -429,8 +429,8 @@ export default function HomePage() {
                 <div className="flex items-center gap-6 mb-6">
                   <div className="relative">
                     <img
-                      src={testimonials[currentTestimonial].image || "/placeholder.svg"}
-                      alt={testimonials[currentTestimonial].name}
+                      src={testimonials[currentTestimonial]?.image || "/placeholder.svg"}
+                      alt={testimonials[currentTestimonial]?.name || ""}
                       className="w-16 h-16 rounded-full object-cover shadow-lg"
                     />
                     <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
