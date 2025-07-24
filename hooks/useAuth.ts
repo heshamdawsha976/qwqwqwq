@@ -45,8 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string, fullName?: string) => {
     setLoading(true)
     try {
-      await AuthService.signUp(email, password, fullName)
-      const user = await AuthService.getCurrentUser()
+      await AuthService.register(fullName || 'User', email, password)
+      const user = AuthService.getCurrentUser()
       setUser(user)
     } finally {
       setLoading(false)
