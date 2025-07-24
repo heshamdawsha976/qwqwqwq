@@ -42,12 +42,12 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleReload = () => {
-    this.setState({ hasError: false, error: undefined, errorInfo: undefined })
+    this.setState({ hasError: false, error: null, errorInfo: null })
     window.location.reload()
   }
 
   private handleReset = () => {
-    this.setState({ hasError: false, error: undefined, errorInfo: undefined })
+    this.setState({ hasError: false, error: null, errorInfo: null })
   }
 
   public render() {
