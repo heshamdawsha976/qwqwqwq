@@ -1,4 +1,30 @@
-export interface Database {
+export interface AdminSettings {
+  app_name: string;
+  app_description: string;
+  app_url: string;
+  contact_email: string;
+  support_email: string;
+  openai_api_key: string;
+  anthropic_api_key: string;
+  ai_model: string;
+  max_tokens: number;
+  usdt_address: string;
+  tron_api_key: string;
+  min_payment_amount: number;
+  payment_confirmation_time: number;
+  enable_registration: boolean;
+  enable_chat: boolean;
+  enable_templates: boolean;
+  enable_analytics: boolean;
+  enable_custom_domains: boolean;
+  free_websites_limit: number;
+  basic_websites_limit: number;
+  advanced_websites_limit: number;
+  pro_websites_limit: number;
+  basic_plan_price: number;
+  advanced_plan_price: number;
+  pro_plan_price: number;
+}
   public: {
     Tables: {
       users: {
