@@ -43,8 +43,10 @@ export async function POST(request: NextRequest) {
     
     // Create the order
     const order = await createOrder({
-      ...validatedData,
-      status: 'pending'
+      userId: validatedData.userId,
+      plan: validatedData.plan,
+      amount: validatedData.amount,
+      currency: validatedData.currency
     });
     
     return NextResponse.json({ 
