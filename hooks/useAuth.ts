@@ -42,6 +42,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return () => subscription.unsubscribe()
     }
+    
+    // Return empty cleanup function if AuthService is not available
+    return () => {}
   }, [])
 
   const signIn = async (email: string, password: string) => {
