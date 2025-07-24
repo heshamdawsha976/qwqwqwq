@@ -93,8 +93,7 @@ const nextConfig = {
   // ضغط الملفات
   compress: true,
   
-  // تحسين الخطوط
-  optimizeFonts: true,
+  // تحسين الخطوط - removed optimizeFonts as it's deprecated in Next.js 15
   
   // إزالة console.log في الإنتاج
   compiler: {
