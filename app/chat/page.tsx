@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { MessageCircle, Send, Bot, User, Eye, Code, Palette, Globe, ArrowRight, Sparkles } from "lucide-react"
 import Link from "next/link"
+import { getTemplateById } from "@/lib/templates"
+import { ChatState } from "@/lib/ai-responses"
 
 interface Message {
   id: string
@@ -35,14 +36,13 @@ export default function ChatPage() {
   ])
   const [inputValue, setInputValue] = useState("")
   const [isTyping, setIsTyping] = useState(false)
-  const [currentStep, setCurrentStep] = useState(1)
-  const [websiteData, setWebsiteData] = useState({
-    type: "",
-    title: "",
-    description: "",
-    colors: ["#3B82F6", "#8B5CF6"],
-    template: "modern",
+  const [chatState, setChatState] = useState<ChatState>({
+    step: 'welcome',
+    businessType: '',
+    businessName: '',
+    description: '',
   })
+  const [websitePreview, setWebsitePreview] = useState<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -64,47 +64,112 @@ export default function ChatPage() {
     }
 
     setMessages((prev) => [...prev, userMessage])
+    const currentInput = inputValue
     setInputValue("")
     setIsTyping(true)
 
-    // Simulate AI response
-    setTimeout(() => {
-      let botResponse = ""
-      let preview = null
+    try {
+      // Call our AI API
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: currentInput,
+          chatState: chatState
+        })
+      })
 
-      if (currentStep === 1) {
-        botResponse = "رائع! أفهم أنك تريد إنشاء " + inputValue + ". الآن، ما اسم موقعك أو شركتك؟"
-        setWebsiteData((prev) => ({ ...prev, type: inputValue }))
-        setCurrentStep(2)
-      } else if (currentStep === 2) {
-        botResponse = "ممتاز! " + inputValue + " اسم جميل. الآن أخبرني بوصف مختصر عن موقعك أو خدماتك؟"
-        setWebsiteData((prev) => ({ ...prev, title: inputValue }))
-        setCurrentStep(3)
-      } else if (currentStep === 3) {
-        botResponse = "رائع! الآن سأبدأ في إنشاء موقعك. يمكنك مشاهدة المعاينة على اليمين."
-        setWebsiteData((prev) => ({ ...prev, description: inputValue }))
-        preview = {
-          title: websiteData.title,
-          description: inputValue,
-          template: "modern",
-          colors: ["#3B82F6", "#8B5CF6"],
+      const data = await response.json()
+      
+      if (data.success) {
+        const aiResponse = data.response
+        
+        // Update chat state based on current step
+        let newChatState = { ...chatState }
+        let preview = null
+        
+        if (chatState.step === 'welcome' || chatState.step === 'business_type') {
+          if (aiResponse.action === 'request_info' && aiResponse.templateType) {
+            newChatState = {
+              ...chatState,
+              step: 'business_name',
+              businessType: currentInput
+            }
+          }
+        } else if (chatState.step === 'business_name') {
+          newChatState = {
+            ...chatState,
+            step: 'description',
+            businessName: currentInput
+          }
+        } else if (chatState.step === 'description') {
+          newChatState = {
+            ...chatState,
+            step: 'customization',
+            description: currentInput
+          }
+          
+          // Show website preview
+          if (aiResponse.action === 'show_template') {
+            const templateId = getTemplateIdFromBusinessType(chatState.businessType)
+            const template = getTemplateById(templateId)
+            if (template) {
+              preview = {
+                title: chatState.businessName,
+                description: currentInput,
+                template: template.name,
+                colors: template.colors,
+                html: template.html,
+                css: template.css
+              }
+              setWebsitePreview(preview)
+            }
+          }
+        } else if (chatState.step === 'customization') {
+          newChatState = {
+            ...chatState,
+            step: 'finalize'
+          }
         }
-        setCurrentStep(4)
+        
+        setChatState(newChatState)
+        
+        // Add AI response after delay
+        setTimeout(() => {
+          const botMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            type: "bot",
+            content: aiResponse.message,
+            timestamp: new Date(),
+            websitePreview: preview,
+          }
+
+          setMessages((prev) => [...prev, botMessage])
+          setIsTyping(false)
+        }, aiResponse.delay)
+        
       } else {
-        botResponse = "يمكنني مساعدتك في تعديل التصميم أو المحتوى. ما الذي تريد تغييره؟"
+        throw new Error(data.error)
       }
 
-      const botMessage: Message = {
+    } catch (error) {
+      console.error('Error:', error)
+      const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: "bot",
-        content: botResponse,
+        content: "عذراً، حدث خطأ. يرجى المحاولة مرة أخرى.",
         timestamp: new Date(),
-        websitePreview: preview,
       }
-
-      setMessages((prev) => [...prev, botMessage])
+      setMessages((prev) => [...prev, errorMessage])
       setIsTyping(false)
-    }, 1500)
+    }
+  }
+
+  const handleQuickAction = async (action: string) => {
+    setInputValue(action)
+    await handleSendMessage()
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -112,6 +177,29 @@ export default function ChatPage() {
       e.preventDefault()
       handleSendMessage()
     }
+  }
+
+  const getTemplateIdFromBusinessType = (businessType: string): string => {
+    const typeMap: Record<string, string> = {
+      'مطعم': 'restaurant-001',
+      'متجر': 'shop-001',
+      'عيادة': 'clinic-001',
+      'معرض أعمال': 'portfolio-001',
+      'شركة': 'business-001'
+    }
+    return typeMap[businessType] || 'restaurant-001'
+  }
+
+  const getCurrentStep = () => {
+    const stepMap: Record<string, number> = {
+      'welcome': 1,
+      'business_type': 1,
+      'business_name': 2,
+      'description': 3,
+      'customization': 4,
+      'finalize': 4
+    }
+    return stepMap[chatState.step] || 1
   }
 
   const quickActions = ["موقع شركة", "متجر إلكتروني", "مدونة شخصية", "موقع مطعم", "معرض أعمال", "موقع خدمات"]
@@ -150,13 +238,13 @@ export default function ChatPage() {
               <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
                 <div
                   className="bg-gradient-to-r from-blue-600 to-purple-600 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${(currentStep / 4) * 100}%` }}
+                  style={{ width: `${(getCurrentStep() / 4) * 100}%` }}
                 ></div>
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                  الخطوة {currentStep} من 4
+                  الخطوة {getCurrentStep()} من 4
                 </div>
               </div>
             </CardHeader>
@@ -228,7 +316,7 @@ export default function ChatPage() {
               </ScrollArea>
 
               {/* Quick Actions */}
-              {currentStep === 1 && (
+              {(chatState.step === 'welcome' || chatState.step === 'business_type') && (
                 <div className="p-4 border-t bg-gray-50">
                   <p className="text-sm text-gray-600 mb-3">أو اختر من الخيارات السريعة:</p>
                   <div className="grid grid-cols-2 gap-2">
@@ -237,7 +325,7 @@ export default function ChatPage() {
                         key={index}
                         variant="outline"
                         size="sm"
-                        onClick={() => setInputValue(action)}
+                        onClick={() => handleQuickAction(action)}
                         className="text-xs justify-start"
                       >
                         {action}
@@ -247,40 +335,17 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {currentStep === 2 && (
-                <div className="p-4 border-t bg-gray-50">
-                  <p className="text-sm text-gray-600 mb-3">أمثلة على أسماء المواقع:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {["شركة النجاح", "متجر الأناقة", "مطعم الذوق", "عيادة الصحة"].map((name, index) => (
-                      <Button
-                        key={index}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setInputValue(name)}
-                        className="text-xs"
-                      >
-                        {name}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {currentStep === 4 && (
+              {chatState.step === 'finalize' && (
                 <div className="p-4 border-t bg-blue-50">
-                  <p className="text-sm text-blue-600 mb-3">يمكنك الآن:</p>
+                  <p className="text-sm text-blue-600 mb-3">موقعك جاهز! اختر الخطة المناسبة:</p>
                   <div className="flex flex-wrap gap-2">
+                    <Link href="/pricing">
+                      <Button size="sm" className="text-xs bg-green-600 hover:bg-green-700">
+                        اختر الخطة ودفع
+                      </Button>
+                    </Link>
                     <Button size="sm" variant="outline" className="text-xs bg-transparent">
-                      تغيير الألوان
-                    </Button>
-                    <Button size="sm" variant="outline" className="text-xs bg-transparent">
-                      إضافة صفحة
-                    </Button>
-                    <Button size="sm" variant="outline" className="text-xs bg-transparent">
-                      تعديل المحتوى
-                    </Button>
-                    <Button size="sm" className="text-xs bg-green-600 hover:bg-green-700">
-                      نشر الموقع
+                      تعديل التصميم
                     </Button>
                   </div>
                 </div>
@@ -346,64 +411,21 @@ export default function ChatPage() {
             </CardHeader>
 
             <CardContent className="flex-1 p-0">
-              {currentStep >= 4 ? (
+              {websitePreview ? (
                 <div className="h-full bg-white">
                   {/* Website Preview */}
                   <div className="h-full overflow-auto">
-                    <div className="min-h-full bg-gradient-to-br from-blue-50 to-purple-50">
-                      {/* Preview Header */}
-                      <div className="bg-white shadow-sm p-4">
-                        <div className="flex items-center justify-between max-w-6xl mx-auto">
-                          <h1 className="text-2xl font-bold text-gray-800">{websiteData.title || "موقعي"}</h1>
-                          <nav className="flex gap-6">
-                            <a href="#" className="text-gray-600 hover:text-blue-600">
-                              الرئيسية
-                            </a>
-                            <a href="#" className="text-gray-600 hover:text-blue-600">
-                              من نحن
-                            </a>
-                            <a href="#" className="text-gray-600 hover:text-blue-600">
-                              الخدمات
-                            </a>
-                            <a href="#" className="text-gray-600 hover:text-blue-600">
-                              اتصل بنا
-                            </a>
-                          </nav>
-                        </div>
-                      </div>
-
-                      {/* Preview Hero */}
-                      <div className="py-20 px-4 text-center">
-                        <div className="max-w-4xl mx-auto">
-                          <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                            {websiteData.title || "عنوان موقعك"}
-                          </h1>
-                          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-                            {websiteData.description || "وصف موقعك سيظهر هنا"}
-                          </p>
-                          <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600">
-                            ابدأ الآن
-                            <ArrowRight className="mr-2 h-5 w-5" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Preview Features */}
-                      <div className="py-16 px-4 bg-white">
-                        <div className="max-w-6xl mx-auto">
-                          <h2 className="text-3xl font-bold text-center mb-12">خدماتنا</h2>
-                          <div className="grid md:grid-cols-3 gap-8">
-                            {[1, 2, 3].map((item) => (
-                              <div key={item} className="text-center p-6 rounded-lg border shadow-sm">
-                                <div className="w-16 h-16 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full mx-auto mb-4"></div>
-                                <h3 className="text-xl font-bold mb-2">خدمة {item}</h3>
-                                <p className="text-gray-600">وصف الخدمة يظهر هنا</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    <div 
+                      className="min-h-full"
+                      dangerouslySetInnerHTML={{
+                        __html: `
+                          <style>${websitePreview.css}</style>
+                          ${websitePreview.html
+                            .replace(/\{\{businessName\}\}/g, chatState.businessName || 'موقعي')
+                            .replace(/\{\{businessDescription\}\}/g, chatState.description || 'وصف الموقع')}
+                        `
+                      }}
+                    />
                   </div>
                 </div>
               ) : (
