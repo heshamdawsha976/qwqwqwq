@@ -79,10 +79,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updateProfile,
   }
 
-  return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
+  return React.createElement(
+    AuthContext.Provider,
+    { value: contextValue },
+    children
   )
 }
 
