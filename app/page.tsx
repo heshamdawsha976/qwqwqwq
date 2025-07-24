@@ -450,7 +450,7 @@ export default function HomePage() {
                 </div>
 
                 <blockquote className="text-lg text-gray-700 italic leading-relaxed mb-6">
-                  "{testimonials[currentTestimonial].content}"
+                  "{testimonials[currentTestimonial]?.content || ""}"
                 </blockquote>
 
                 {/* Navigation */}
