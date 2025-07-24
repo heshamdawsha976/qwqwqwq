@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <MyAuthContext.Provider
+    <AuthContext.Provider
       value={{
         user,
         loading,
@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
-    </MyAuthContext.Provider>
+    </AuthContext.Provider>
   )
 }
 
