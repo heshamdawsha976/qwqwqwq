@@ -1,229 +1,103 @@
-"use client"
+// Database utilities for simple JSON file storage
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
-import { createClient } from "@supabase/supabase-js"
+const DATA_DIR = path.join(process.cwd(), 'data');
 
-// إعداد Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "your-supabase-url"
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "your-supabase-anon-key"
-
-export const supabase = createClient(supabaseUrl, supabaseKey)
-
-// أنواع البيانات
-export interface User {
-  id: string
-  email: string
-  phone?: string
-  full_name?: string
-  avatar_url?: string
-  subscription_plan: "free" | "basic" | "advanced" | "pro"
-  subscription_status: "active" | "inactive" | "expired"
-  subscription_expires_at?: string
-  total_spent: number
-  created_at: string
-  updated_at: string
+// Ensure data directory exists
+export async function ensureDataDir() {
+  try {
+    await fs.access(DATA_DIR);
+  } catch {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+  }
 }
 
-export interface Website {
-  id: string
-  user_id: string
-  title: string
-  description?: string
-  domain: string
-  custom_domain?: string
-  template_id: string
-  status: "draft" | "published" | "suspended"
-  content: any
-  settings: any
-  analytics: any
-  total_visits: number
-  last_published_at?: string
-  created_at: string
-  updated_at: string
+// Generic function to read JSON file
+export async function readJsonFile<T>(filename: string, defaultData: T): Promise<T> {
+  await ensureDataDir();
+  const filePath = path.join(DATA_DIR, filename);
+  
+  try {
+    const data = await fs.readFile(filePath, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    // File doesn't exist, create it with default data
+    await writeJsonFile(filename, defaultData);
+    return defaultData;
+  }
 }
 
-export interface Template {
-  id: string
-  name: string
-  description?: string
-  category: string
-  preview_image?: string
-  template_data: any
-  is_featured: boolean
-  is_active: boolean
-  usage_count: number
-  rating: number
-  created_at: string
-  updated_at: string
+// Generic function to write JSON file
+export async function writeJsonFile<T>(filename: string, data: T): Promise<void> {
+  await ensureDataDir();
+  const filePath = path.join(DATA_DIR, filename);
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
-// دوال قاعدة البيانات
-export class DatabaseService {
-  // المستخدمين
-  static async createUser(userData: Partial<User>) {
-    const { data, error } = await supabase.from("users").insert(userData).select().single()
+// Order management
+export interface Order {
+  id: string;
+  customerName: string;
+  email: string;
+  phone?: string;
+  websiteType: 'restaurant' | 'shop' | 'clinic' | 'portfolio' | 'business';
+  plan: 'basic' | 'advanced' | 'pro';
+  amount: number;
+  currency: 'USD' | 'SAR';
+  status: 'pending' | 'paid' | 'cancelled';
+  paymentId?: string;
+  websiteData: {
+    title: string;
+    description: string;
+    sections: string[];
+    colors: string[];
+    customizations: Record<string, any>;
+  };
+  createdAt: string;
+  updatedAt: string;
+  deliveredAt?: string;
+}
 
-    if (error) throw error
-    return data
-  }
+export interface OrdersData {
+  orders: Order[];
+  nextId: number;
+}
 
-  static async getUserByEmail(email: string) {
-    const { data, error } = await supabase.from("users").select("*").eq("email", email).single()
+export async function getOrders(): Promise<Order[]> {
+  const data = await readJsonFile<OrdersData>('orders.json', { orders: [], nextId: 1 });
+  return data.orders;
+}
 
-    if (error && error.code !== "PGRST116") throw error
-    return data
-  }
+export async function createOrder(order: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>): Promise<Order> {
+  const data = await readJsonFile<OrdersData>('orders.json', { orders: [], nextId: 1 });
+  
+  const newOrder: Order = {
+    ...order,
+    id: `ORDER${data.nextId.toString().padStart(3, '0')}`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  
+  data.orders.push(newOrder);
+  data.nextId += 1;
+  
+  await writeJsonFile('orders.json', data);
+  return newOrder;
+}
 
-  static async updateUser(id: string, updates: Partial<User>) {
-    const { data, error } = await supabase
-      .from("users")
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  // المواقع
-  static async createWebsite(websiteData: Partial<Website>) {
-    const { data, error } = await supabase.from("websites").insert(websiteData).select().single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async getUserWebsites(userId: string) {
-    const { data, error } = await supabase
-      .from("websites")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-
-    if (error) throw error
-    return data
-  }
-
-  static async updateWebsite(id: string, updates: Partial<Website>) {
-    const { data, error } = await supabase
-      .from("websites")
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async deleteWebsite(id: string) {
-    const { error } = await supabase.from("websites").delete().eq("id", id)
-
-    if (error) throw error
-  }
-
-  // القوالب
-  static async getTemplates(category?: string) {
-    let query = supabase
-      .from("templates")
-      .select("*")
-      .eq("is_active", true)
-      .order("is_featured", { ascending: false })
-      .order("usage_count", { ascending: false })
-
-    if (category && category !== "الكل") {
-      query = query.eq("category", category)
-    }
-
-    const { data, error } = await query
-    if (error) throw error
-    return data
-  }
-
-  static async getFeaturedTemplates() {
-    const { data, error } = await supabase
-      .from("templates")
-      .select("*")
-      .eq("is_featured", true)
-      .eq("is_active", true)
-      .order("usage_count", { ascending: false })
-
-    if (error) throw error
-    return data
-  }
-
-  // المدفوعات
-  static async createPayment(paymentData: any) {
-    const { data, error } = await supabase.from("payments").insert(paymentData).select().single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async updatePaymentStatus(id: string, status: string, transactionHash?: string) {
-    const updates: any = {
-      status,
-      updated_at: new Date().toISOString(),
-    }
-
-    if (transactionHash) {
-      updates.transaction_hash = transactionHash
-    }
-
-    const { data, error } = await supabase.from("payments").update(updates).eq("id", id).select().single()
-
-    if (error) throw error
-    return data
-  }
-
-  // التحليلات
-  static async recordVisit(websiteId: string, visitorData: any) {
-    const { error } = await supabase.from("analytics").insert({
-      website_id: websiteId,
-      ...visitorData,
-    })
-
-    if (error) throw error
-
-    // تحديث عداد الزيارات
-    await supabase.rpc("increment_visits", { website_id: websiteId })
-  }
-
-  static async getWebsiteAnalytics(websiteId: string, days = 30) {
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - days)
-
-    const { data, error } = await supabase
-      .from("analytics")
-      .select("*")
-      .eq("website_id", websiteId)
-      .gte("created_at", startDate.toISOString())
-      .order("created_at", { ascending: false })
-
-    if (error) throw error
-    return data
-  }
-
-  // الإعدادات
-  static async getSetting(key: string) {
-    const { data, error } = await supabase.from("settings").select("value").eq("key", key).single()
-
-    if (error && error.code !== "PGRST116") throw error
-    return data?.value
-  }
-
-  static async updateSetting(key: string, value: any) {
-    const { data, error } = await supabase
-      .from("settings")
-      .upsert({
-        key,
-        value,
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
+export async function updateOrder(id: string, updates: Partial<Order>): Promise<Order | null> {
+  const data = await readJsonFile<OrdersData>('orders.json', { orders: [], nextId: 1 });
+  
+  const orderIndex = data.orders.findIndex(order => order.id === id);
+  if (orderIndex === -1) return null;
+  
+  data.orders[orderIndex] = {
+    ...data.orders[orderIndex],
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+  
+  await writeJsonFile('orders.json', data);
+  return data.orders[orderIndex];
 }
