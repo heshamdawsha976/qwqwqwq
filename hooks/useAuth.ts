@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, createContext, useContext } from "react"
-import { AuthService, type AuthUser } from "@/lib/auth"
+import { authService as AuthService, type AuthUser } from "@/lib/auth"
 
 interface AuthContextType {
   user: AuthUser | null
