@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, createContext, useContext } from "react"
-import { authService as AuthService, type AuthUser } from "@/lib/auth"
+import { authService, type AuthUser } from "@/lib/auth"
 
 interface AuthContextType {
   user: AuthUser | null
@@ -12,7 +12,8 @@ interface AuthContextType {
   updateProfile: (updates: Partial<AuthUser>) => Promise<void>
 }
 
-const AuthContext = React.createContext<AuthContextType | undefined>(undefined)
+// Create the context with proper typing
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -20,11 +21,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Get initial user
-    if (AuthService) {
-      const user = AuthService.getCurrentUser()
-      setUser(user)
+    try {
+      const currentUser = authService.getCurrentUser()
+      setUser(currentUser)
       setLoading(false)
-    } else {
+    } catch (error) {
+      console.error('Auth error:', error)
       setLoading(false)
     }
   }, [])
@@ -32,8 +34,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     setLoading(true)
     try {
-      await AuthService.login(email, password)
-      const user = AuthService.getCurrentUser()
+      await authService.login(email, password)
+      const user = authService.getCurrentUser()
       setUser(user)
     } finally {
       setLoading(false)
@@ -43,8 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string, fullName?: string) => {
     setLoading(true)
     try {
-      await AuthService.register(fullName || 'User', email, password)
-      const user = AuthService.getCurrentUser()
+      await authService.register(fullName || 'User', email, password)
+      const user = authService.getCurrentUser()
       setUser(user)
     } finally {
       setLoading(false)
@@ -54,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     setLoading(true)
     try {
-      await AuthService.logout()
+      await authService.logout()
       setUser(null)
     } finally {
       setLoading(false)
@@ -64,21 +66,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = async (updates: Partial<AuthUser>) => {
     if (!user) throw new Error("Not authenticated")
 
-    await AuthService.updateProfile(updates)
+    await authService.updateProfile(updates)
     setUser({ ...user, ...updates })
   }
 
+  const contextValue: AuthContextType = {
+    user,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+    updateProfile,
+  }
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        signIn,
-        signUp,
-        signOut,
-        updateProfile,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   )
